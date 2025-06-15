@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 
-st.set_page_config(page_title="🚀 AI SEO Blog Generator", layout="wide")
+st.set_page_config(page_title="AI SEO Blog Generator", layout="wide")
 st.title("📝 AI-Powered SEO Blog Generator")
 
 # Sidebar controls
