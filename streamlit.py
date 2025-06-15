@@ -23,29 +23,36 @@ add_cta = st.sidebar.checkbox("Add Call-to-Action")
 st.subheader("🔍 Keyword Suggestions")
 seed_keyword = st.text_input("Enter a broad keyword to get suggestions")
 if st.button("Suggest Keywords"):
-    with st.spinner("Thinking of smart ideas..."):
-        prompt = f"Generate 10 long-tail SEO keywords based on the keyword '{seed_keyword}' with high search intent."
-        response = requests.post(
-            "https://api.together.xyz/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {TOGETHER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-                "messages": [
-                    {"role": "system", "content": "You are an SEO expert."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.5,
-                "max_tokens": 300,
-            }
-        )
-        if response.status_code == 200:
-            suggestions = response.json()["choices"][0]["message"]["content"]
-            st.code(suggestions)
-        else:
-            st.error("Failed to fetch suggestions.")
+    if not TOGETHER_API_KEY:
+        st.error("API key is missing. Please set TOGETHER_API_KEY.")
+    else:
+        with st.spinner("Thinking of smart ideas..."):
+            try:
+                prompt = f"Generate 10 long-tail SEO keywords based on the keyword '{seed_keyword}' with high search intent."
+                response = requests.post(
+                    "https://api.together.xyz/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {TOGETHER_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+                        "messages": [
+                            {"role": "system", "content": "You are an SEO expert."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.5,
+                        "max_tokens": 300,
+                    }
+                )
+                if response.status_code == 200:
+                    suggestions = response.json()["choices"][0]["message"]["content"]
+                    st.code(suggestions)
+                else:
+                    error_msg = response.json().get("error", {}).get("message", "Unknown error")
+                    st.error(f"Failed to fetch suggestions: {error_msg}")
+            except Exception as e:
+                st.error(f"Error while calling API: {str(e)}")
 
 # Prompt builder
 def build_prompt(keyword):
@@ -63,26 +70,30 @@ def build_prompt(keyword):
 # Content Generator Function
 def generate_blog(keyword):
     prompt = build_prompt(keyword)
-    response = requests.post(
-        "https://api.together.xyz/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {TOGETHER_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-            "messages": [
-                {"role": "system", "content": "You are a professional SEO blog writer."},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": temperature,
-            "max_tokens": max_tokens
-        }
-    )
-    if response.status_code == 200:
-        return response.json()["choices"][0]["message"]["content"]
-    else:
-        return f"Error: {response.status_code}\n{response.text}"
+    try:
+        response = requests.post(
+            "https://api.together.xyz/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {TOGETHER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+                "messages": [
+                    {"role": "system", "content": "You are a professional SEO blog writer."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            }
+        )
+        data = response.json()
+        if response.status_code == 200:
+            return data["choices"][0]["message"]["content"]
+        else:
+            return f"API Error: {data.get('error', {}).get('message', 'Unknown error')}"
+    except Exception as e:
+        return f"Exception occurred: {str(e)}"
 
 # Blog Generation Mode
 st.subheader("🛠 Blog Generator")
@@ -92,8 +103,11 @@ if mode == "Single Keyword":
     if st.button("Generate Blog") and keyword:
         with st.spinner("Crafting your blog..."):
             blog = generate_blog(keyword)
-            st.markdown(blog)
-            st.download_button("📥 Download Blog", blog, file_name=f"{keyword.replace(' ', '_')}.txt")
+            if blog.startswith("API Error") or blog.startswith("Exception"):
+                st.error(blog)
+            else:
+                st.markdown(blog)
+                st.download_button("📥 Download Blog", blog, file_name=f"{keyword.replace(' ', '_')}.txt")
 
 elif mode == "Bulk Upload":
     uploaded_file = st.file_uploader("Upload CSV with 'keyword' column", type=["csv"])
